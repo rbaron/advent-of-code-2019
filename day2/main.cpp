@@ -30,7 +30,7 @@ void run_program(std::vector<int>& tape) {
         pc += 4;
 }
 
-const std::vector<int> read_tape_from_disk(std::string filename) {
+const std::vector<int> read_tape_from_disk(const std::string& filename) {
     std::vector<int> tape;
 
     std::ifstream file(filename);
