@@ -1,59 +1,55 @@
+#include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <vector>
 
-// Part 1
-inline bool is_passwd_valid1(int passwd) {
-    if (std::ceil(std::log10(passwd)) != 6) return false;
+using us_int =  unsigned short;
+using digit_count = std::pair<us_int,us_int>;
 
-    bool has_adjacent_same_digit = false;
-    unsigned short curr_last_digit, old_last_digit = passwd % 10;
-    passwd /= 10;
-
-    while (passwd > 0) {
-        curr_last_digit = passwd % 10;
-        if (curr_last_digit > old_last_digit) return false;
-        if (curr_last_digit == old_last_digit) has_adjacent_same_digit = true;
-        old_last_digit = curr_last_digit;
-        passwd /= 10;
+inline std::vector<digit_count> run_length_encode(int number) {
+    std::vector<digit_count> ret;
+    ret.reserve(std::ceil(std::log10(number)));
+    us_int curr_digit = number % 10;
+    us_int occurrences = 1;
+    number /= 10;
+    while (number > 0) {
+        us_int new_digit = number % 10;
+        if (new_digit == curr_digit) occurrences++;
+        else {
+            ret.push_back(digit_count(curr_digit, occurrences));
+            curr_digit = new_digit;
+            occurrences = 1;
+        }
+        number /= 10;
     }
-    return has_adjacent_same_digit;
+    ret.push_back(digit_count(curr_digit, occurrences));
+    return ret;
 }
 
-// Part 2
-inline bool is_passwd_valid2(int passwd) {
-    if (std::ceil(std::log10(passwd)) != 6) return false;
-
-    bool has_adjacent_double_digits = false;
-    unsigned short curr_last_digit;
-    unsigned short old_last_digit = passwd % 10;
-    unsigned short current_group_size = 1;
-    passwd /= 10;
-
-    while (passwd > 0) {
-        curr_last_digit = passwd % 10;
-        if (curr_last_digit > old_last_digit) return false;
-        if (curr_last_digit == old_last_digit) {
-            current_group_size++;
-        } else {
-            if (current_group_size == 2) has_adjacent_double_digits = true;
-            current_group_size = 1;
-        }
-        old_last_digit = curr_last_digit;
-        passwd /= 10;
-    }
-
-    if (current_group_size == 2) has_adjacent_double_digits = true;
-    return has_adjacent_double_digits;
+inline bool is_increasing(const std::vector<digit_count> counts) {
+    // Reverse iterators since we store the counts from right to left
+    return std::is_sorted(counts.rbegin(), counts.rend());
 }
 
 int main() {
     int n_part1 = 0, n_part2 = 0;
     int lo = 125730;
     int hi = 579381;
-    for (auto i=lo; i<=hi; i++) {
-        if (is_passwd_valid1(i)) n_part1++;
-        if (is_passwd_valid2(i)) n_part2++;
+    for (auto pw = lo; pw <= hi; pw++) {
+        auto counts = run_length_encode(pw);
+
+        if (!is_increasing(counts)) continue;
+
+        // Part 1
+        if (std::any_of(counts.begin(), counts.end(), [](digit_count c){ return c.second >= 2; })) {
+            n_part1++;
+        }
+
+        // Part 2
+        if (std::any_of(counts.begin(), counts.end(), [](digit_count c){ return c.second == 2; })) {
+            n_part2++;
+        }
     }
-    std::cout << n_part1 << std::endl;
-    std::cout << n_part2 << std::endl;
+    std::cout << "Part 1: " << n_part1 << std::endl;
+    std::cout << "Part22: " << n_part2 << std::endl;
 }
