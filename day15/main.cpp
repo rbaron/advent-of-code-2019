@@ -7,6 +7,7 @@
 
 #include "cpu.hpp"
 
+using coord_t = std::pair<int,int>;
 using path_t = std::vector<int>;
 const std::vector<int> moves = {1, 2, 3, 4};
 
@@ -29,6 +30,22 @@ std::pair<CPU, int> run_robot(CPU cpu, const path_t& path) {
     return {cpu, out_code};
 }
 
+std::pair<CPU, int> step_robot(CPU cpu, int move) {
+    int out_code = -1;
+    cpu.get_ostream() << move << std::endl;
+    run_until_output_is_produced(cpu);
+    cpu.get_istream() >> out_code;
+    return {cpu, out_code};
+}
+
+coord_t step(coord_t pos, int move) {
+    switch (move) { case 1: pos.second--; break;
+                    case 2: pos.second++; break;
+                    case 3: pos.first--; break;
+                    case 4: pos.first++; break; }
+    return pos;
+}
+
 std::pair<int,int> get_pos(const path_t& path) {
     int x = 0, y = 0;
     for (auto m : path) {
@@ -40,14 +57,16 @@ std::pair<int,int> get_pos(const path_t& path) {
     return std::pair<int,int>(x, y);
 }
 
-path_t path_to_oxygen_tank(const Tape& tape) {
+path_t path_to_oxygen_tank(const Tape& tape_in) {
     std::stringbuf buf;
     std::istream in(&buf);
     std::ostream out(&buf);
-    CPU cpu(tape, in, out);
+    Tape tape(tape_in);
+    CPU initial_cpu(tape, in, out);
+    // const auto& initial_cpu = run_robot(cpu_in, {}).first;
 
-    std::queue<path_t> paths;
-    for (auto move : moves) { paths.push(path_t{move}); };
+    std::queue<std::tuple<CPU, coord_t, path_t>> paths;
+    for (auto move : moves) paths.push({initial_cpu, {0,0}, {move}});
 
     std::set<std::pair<int,int>> visited;
 
@@ -55,21 +74,26 @@ path_t path_to_oxygen_tank(const Tape& tape) {
         auto path = paths.front();
         paths.pop();
 
-        auto pos = get_pos(path);
-        if (visited.count(pos) > 0) continue;
+        auto old_cpu = std::get<0>(path);
+        auto pos = std::get<1>(path);
+        auto actual_path = std::get<2>(path);
 
-        visited.insert(pos);
+        auto cpu_code = step_robot(old_cpu, actual_path.back());
+        const auto& new_cpu = cpu_code.first;
+        const auto& code = cpu_code.second;
 
-        // Check if robot found ox tank
-        auto cpu_code = run_robot(cpu, path);
+        if (code == 2) {
+            return actual_path;
+        } else if (code == 1) {
+            auto new_pos = step(pos, actual_path.back());
 
-        if (cpu_code.second == 2) {
-            return path;
-        } else if (cpu_code.second == 1) {
+            if (visited.count(new_pos) > 0) continue;
+            visited.insert(new_pos);
+
             for (auto move : moves) {
-                auto new_path(path);
+                auto new_path(actual_path);
                 new_path.push_back(move);
-                paths.push(new_path);
+                paths.push({new_cpu, new_pos, new_path});
             }
         }
     }
@@ -84,37 +108,35 @@ int simulate_oxygen_dispersion(const Tape& tape_in, const path_t& initial_path) 
     CPU cpu_in(tape, in, out);
     const auto& initial_cpu = run_robot(cpu_in, initial_path).first;
 
-    std::queue<std::tuple<CPU, path_t, int>> paths;
-    for (auto move : moves) { paths.push({initial_cpu, path_t{move}, 0}); };
+    std::queue<std::tuple<CPU, coord_t, int, int>> paths;
+    for (auto move : moves) paths.push({initial_cpu, {0,0}, move, 0});
 
     std::set<std::pair<int,int>> visited;
 
     int max_steps = 0;
     while (paths.size() > 0) {
-        auto cpu_path_step = paths.front();
+        auto path = paths.front();
         paths.pop();
 
-        auto old_cpu = initial_cpu;
-        auto path = std::get<1>(cpu_path_step);
+        auto old_cpu = std::get<0>(path);
+        auto pos = std::get<1>(path);
+        auto move = std::get<2>(path);
+        auto steps = std::get<3>(path);
 
-        auto pos = get_pos(path);
-        if (visited.count(pos) > 0) continue;
-
-        visited.insert(pos);
-
-        CPU cpu(old_cpu);
-
-        auto cpu_code = run_robot(cpu, path);
+        auto cpu_code = step_robot(old_cpu, move);
         const auto& new_cpu = cpu_code.first;
         const auto& code = cpu_code.second;
 
         if (code != 0) {
-            auto steps = path.size();
+            steps++;
+            auto new_pos = step(pos, move);
+
+            if (visited.count(new_pos) > 0) continue;
+            visited.insert(new_pos);
+
             max_steps = steps > max_steps ? steps : max_steps;
             for (auto move : moves) {
-                auto new_path(path);
-                new_path.push_back(move);
-                paths.push({new_cpu, new_path, steps});
+                paths.push({new_cpu, new_pos, move, steps});
             }
         }
     }
