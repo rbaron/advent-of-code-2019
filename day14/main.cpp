@@ -7,7 +7,7 @@
 #include <queue>
 
 
-using term_t = std::pair<std::string,int>;
+using term_t = std::pair<std::string,long long int>;
 struct Reaction {
     term_t out;
     std::vector<term_t> ins;
@@ -41,43 +41,38 @@ std::vector<Reaction> parse_input(const std::string& filename) {
     return reactions;
 }
 
-int main() {
-    auto reactions = parse_input("input.txt");
-    std::unordered_map<std::string, Reaction> tree;
-    for (auto r : reactions)
-        tree[r.out.first] = r;
-
+long long int ore_cost(const std::unordered_map<std::string, Reaction>& tree, long long int fuel) {
     std::queue<term_t> nodes;
-    nodes.push({"FUEL", 1});
+    nodes.push({"FUEL", fuel});
 
-    int used_ore = 0;
-    std::unordered_map<std::string, int> excess;
+    long long int used_ore = 0;
+    std::unordered_map<std::string, long long int> excess;
 
     while (!nodes.empty()) {
         auto node = nodes.front();
         nodes.pop();
 
         std::string element = node.first;
-        int quantity = node.second;
+        auto quantity = node.second;
 
-        std::cout << "Making " << quantity << " of " << element << std::endl;;
+        // std::cout << "Making " << quantity << " of " << element << std::endl;;
 
         if (element == "ORE") {
             used_ore += quantity;
         } else {
-            int uses_excess = std::min(excess[element], quantity);
+            auto uses_excess = std::min(excess[element], quantity);
             excess[element] -= uses_excess;
             quantity -= uses_excess;
 
             if (quantity == 0) continue;
 
             auto r = tree.at(element);
-            int each_produces = r.out.second;
+            auto each_produces = r.out.second;
 
-            int times = quantity / each_produces;
+            auto times = quantity / each_produces;
             if (quantity % each_produces > 0) times++;
 
-            std::cout << "Will run the reaction producing " << element << " " << times << " times" << std::endl;
+            // std::cout << "Will run the reaction producing " << element << " " << times << " times" << std::endl;
 
             excess[element] = each_produces * times - quantity;
 
@@ -87,6 +82,32 @@ int main() {
         }
 
     }
+    return used_ore;
+}
 
-    std::cout << "Used ORE: " << used_ore << std::endl;
+int main() {
+    auto reactions = parse_input("input.txt");
+    std::unordered_map<std::string, Reaction> tree;
+    for (auto r : reactions)
+        tree[r.out.first] = r;
+
+    // Part 1
+    std::cout << "Part 1: " << ore_cost(tree, 1) << std::endl;
+
+    // Part 2
+    const long long int available_ore = 1000000000000;
+
+    long long int lo = 0, hi = available_ore;
+    while (lo < hi) {
+        auto middle = (lo + hi) / 2;
+        if (lo == middle) break;
+
+        if (ore_cost(tree, middle) > available_ore) {
+            hi = middle;
+        } else {
+            lo = middle;
+        }
+    }
+
+    std::cout << "Part 2: " << lo << " ore produces " << ore_cost(tree, lo) << " fuel" << std::endl;
 }
