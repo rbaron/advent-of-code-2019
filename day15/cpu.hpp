@@ -115,6 +115,9 @@ public:
         }
     }
 
+    std::istream& get_istream() { return in; }
+    std::ostream& get_ostream() { return out; }
+
     void mem_dump(size_t start, size_t end) {
         for (int i = start; i < end; i++) {
             std::cout << i << ": " << tape[i] << std::endl;
