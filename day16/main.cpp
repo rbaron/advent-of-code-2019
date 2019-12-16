@@ -20,13 +20,11 @@ std::vector<int> read_input(const std::string& filename) {
 const std::vector<int> generate_pattern(int input_size, int position) {
     std::vector<int> pattern;
     pattern.reserve(input_size);
-    while (true)
-        for (auto pattern_char : base_pattern)
-            for (int i = 0; i < position + 1; i++) {
-                if (pattern.size() == input_size) return pattern;
-                if (pattern_char == base_pattern[0] && pattern.size() == 0 && i == 0) continue;
-                pattern.push_back(pattern_char);
-            }
+    int repeat = position + 1;
+    size_t base_pattern_size = base_pattern.size();
+    for (int i = 0; i < input_size; i++) {
+        pattern.push_back(base_pattern[((i + 1) / repeat) % base_pattern_size]);
+    }
     return pattern;
 }
 

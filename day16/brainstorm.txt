@@ -85,3 +85,44 @@ pairs for calculating out[1]:
 This trick (calculating only the first lcm(pattern size, input size)) works well for small indices into the output,
 but doesn't really refresh much if the size of the pattern is comparable to the size of the input, which does happen.
 
+# Next idea
+
+## What if I only had to calculate out[81]? I'd still have to sum all terms:
+
+out[81] = in[0] * patt[0] + in[1] * patt[1] + ... + in[81] * patt[81] + ... + in[-1] * patt[-1]
+
+### Do the summation members repeat themselves?
+
+input repeats every 650 numbers
+pattern repeats every 4 * 81 numbers = 324 numbers
+
+so the sum will repeat itself after... lcm(650, 324) = 105300
+
+This doesn't sound too little, but comparing with 650 * 10000 = 6.5MM, it is.
+
+## What if we had to calculate:
+
+out[5MM]?
+
+input repeats every 650 numbers
+pattern repeats itself after 4 * 5MM = 20 MM;
+
+...but: the first 5MM elements will be all multiplied by zero, since that's the first char of the repeating pattern!
+
+out[5MM] = 0*in[0] + 0in[1] + 0in[2] + (repeats a total of 5MM - 1 times) + 1 * in[5MM] + 1in[5MM + 1] + 1in[5MM + 1] + ... + 1in[-1]
+
+So if the number is really big (like mine, 5971751), we only every need to calculate out[5971751...6500000].
+
+
+0 1 0 1 0 1 0 1 (pos 0, repeat 1)
+0 0 1 1 0 0 1 1 (pos 1, repeat 2)
+0 0 0 1 1 1 0 0 (pos 2, repeat 3)
+0 0 0 0 1 1 1 1 (each char appears `pos` times) =>
+
+we have len/repeat groups of repeat chars
+so the index into the pattern is: (i + 1)/repeat % len(pattern)
+
+r 1..len+1
+i 0..len
+
+seq[((i + 1) // r) % 4]
