@@ -1,0 +1,87 @@
+
+Ignoring the skipping of the first pattern element:
+
+pattern: 0 1 0 -1
+
+input: 01234 repeated over and over
+
+pairs for calculating out[0]:
+
+0 0
+1 1
+2 0
+3 -1
+4 0
+0 1
+1 0
+2 -1
+3 0
+4 1
+0 0
+1 -1
+2 0
+3 1
+4 0
+0 -1
+1 0
+2 1
+3 0
+4 -1
+0 0         => Repeat! After 20 iterations => lcm(4, 5)
+1 1
+2 0
+3 -1
+4 0
+0 1
+1 0
+2 -1
+3 0
+4 1
+...
+
+pairs for calculating out[1]:
+
+0 0
+1 0
+2 1
+3 1
+4 0
+0 0
+1 -1
+2 -1
+3 0
+4 0
+0 1
+1 1
+2 0
+3 0
+4 -1
+0 -1
+1 0
+2 0
+3 1
+4 1
+0 0
+1 0
+2 -1
+3 -1
+4 0
+0 0
+1 1
+2 1
+3 0
+4 0
+...
+0 0         => Repeat! After 40 iterations => lcm(8, 5)
+1 0
+2 1
+3 1
+4 0
+0 0
+1 -1
+2 -1
+...
+
+This trick (calculating only the first lcm(pattern size, input size)) works well for small indices into the output,
+but doesn't really refresh much if the size of the pattern is comparable to the size of the input, which does happen.
+

@@ -30,29 +30,65 @@ const std::vector<int> generate_pattern(int input_size, int position) {
     return pattern;
 }
 
-const std::vector<int> run_phase(const std::vector<int>& input) {
-    std::vector<int> out(input.size());
-
+void run_phase1(std::vector<int>& input, std::vector<int>& output) {
     for (int i = 0; i < input.size(); i++) {
         auto pattern = generate_pattern(input.size(), i);
-        out[i] = std::abs(
+        output[i] = std::abs(
             std::inner_product(input.begin(), input.end(), pattern.begin(), 0) % 10
         );
     }
-    return out;
 }
+
+void run_phase2(std::vector<int>& input, std::vector<int>& output) {
+    size_t sum  = std::accumulate(input.begin(), input.end(), 0);
+    for (int i = 0; i < output.size(); i++) {
+        output[i] = sum % 10;
+        sum -= input[i];
+    }
+}
+
+void part1(const std::vector<int>& input, const int phases) {
+    std::vector<int> in(input), out(input.size());
+
+    for (int i = 0; i < phases; i++) {
+        if (i % 2 == 0) {
+            run_phase1(in, out);
+        } else {
+            run_phase1(out, in);
+        }
+    }
+
+    std::cout << "Part 1: ";
+    for (int i = 0; i < 8; i++) std::cout << in[i];
+    std::cout << std::endl;
+}
+
+void part2(const std::vector<int>& input, const int phases) {
+    const size_t idx = 5971751;
+    const size_t total_size = 10000 * input.size();
+
+    std::vector<int> in(total_size - idx), out(total_size - idx);
+    for (size_t i = idx; i < total_size; i++) {
+        in[i - idx] = input[i % input.size()];
+    }
+
+    for (int i = 0; i < phases; i++) {
+        if (i % 2 == 0) {
+            run_phase2(in, out);
+        } else {
+            run_phase2(out, in);
+        }
+    }
+
+    std::cout << "Part 2: ";
+    for (int i = 0; i < 8; i++) std::cout << in[i];
+    std::cout << std::endl;
+}
+
 int main() {
     const int phases = 100;
     const auto input = read_input("input.txt");
-    // for (auto c : input) std::cout << c << std::endl;
 
-    auto out(input);
-    for (int i = 0; i < phases; i++) {
-        out = run_phase(out);
-    }
-
-    // Part 1
-    std::cout << "Part 1: ";
-    for (int i = 0; i < 8; i++) std::cout << out[i];
-    std::cout << std::endl;
+    part1(input, phases);
+    part2(input, phases);
 }
