@@ -43,11 +43,10 @@ inline bool is_intersection(const grid_t& grid, coord_t pos) {
     );
 }
 
-int main() {
+void part1(Tape tape) {
     std::stringbuf buf;
     std::istream in(&buf);
     std::ostream out(&buf);
-    const Tape tape = read_tape_from_disk("input.txt");
 
     CPU cpu(tape, in, out);
 
@@ -65,5 +64,39 @@ int main() {
     );
 
     std::cout << "Part 1: " << sum << std::endl;
+}
 
+void part2(Tape tape) {
+    std::stringbuf buf;
+    std::istream in(&buf);
+    std::ostream out(&buf);
+
+    tape[0] = 2;
+    CPU cpu(tape, in, out);
+
+
+    // Using attempt #2 from part2-manual-solve.txt
+    std::string code(R"(A,B,B,C,A,B,C,A,B,C
+L,6,R,12,L,4,L,6
+R,6,L,6,R,12
+L,6,L,10,L,10,R,6
+n
+)");
+
+    for (auto c : code) out << static_cast<int>(c) << std::endl;
+
+    cpu.run_program();
+    int i;
+    while(in >> i) {
+        std::cout << static_cast<char>(i);
+    }
+
+    std::cout << std::endl << "Part 2: score: " << i << std::endl;
+}
+
+int main() {
+    const Tape tape = read_tape_from_disk("input.txt");
+
+    part1(tape);
+    part2(tape);
 }
