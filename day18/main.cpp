@@ -1,9 +1,12 @@
+#include <algorithm>
+#include <bitset>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
 #include <queue>
 #include <unordered_set>
 #include <vector>
+#include <set>
 
 // So we can use std::pair<int,int>s as unordered_{map,set} keys
 struct pair_hash {
@@ -29,6 +32,15 @@ const std::vector<coord_t> neighboring_cells = {
     {-1,0}, {0,1}, {1,0}, {0,-1}
 };
 
+void print_grid(const grid_t& grid, const int height, const int width) {
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            std::cout << grid.at({y,x});
+        }
+            std::cout << std::endl;
+    }
+}
+
 std::pair<grid_t,coord_t> parse_input(const std::string& filename) {
     std::ifstream file(filename);
     grid_t grid;
@@ -39,7 +51,6 @@ std::pair<grid_t,coord_t> parse_input(const std::string& filename) {
         for (auto c : line) {
             if (c == '@') {
                 initial_pos = {y,x};
-                c = '.';
             }
             grid[{y,x++}] = c;
         }
@@ -53,98 +64,183 @@ inline char get_grid_char(const grid_t& grid, const coord_t& coord) {
     return grid.count(coord) > 0 ? grid.at(coord) : '#';
 }
 
-std::vector<std::pair<coord_t,int>> get_possible_targets(const grid_t& grid, const coord_t& origin, const std::unordered_set<char>& keys) {
-    std::vector<std::pair<coord_t,int>> targets;
+/*
+    {
+        b: 12,
+        c: 25,
+        ...
+    }
+*/
+using steps_by_target_t = std::unordered_map<char,size_t>;
+steps_by_target_t get_steps_by_target(const grid_t& grid, const coord_t& origin) {
+    steps_by_target_t targets;
 
     std::unordered_set<coord_t,pair_hash> visited;
-    std::queue<std::pair<coord_t,int>> nodes;
+    std::queue<std::tuple<coord_t,int>> nodes;
     nodes.push({origin, 0});
 
     while (!nodes.empty()) {
         auto node = nodes.front();
         nodes.pop();
 
-        auto coord = node.first;
-        auto steps = node.second;
+        auto coord = std::get<0>(node);
+        auto steps = std::get<1>(node);
 
         if (visited.count(coord) > 0) continue;
 
         visited.insert(coord);
 
-        for (const auto& cell : neighboring_cells) {
-            auto neighbor = coord + cell;
-            // std::cout << "node: " << node << std::endl;
-            // std::cout << "cell: " << cell << std::endl;
-            // std::cout << "neigh: " << neighbor << std::endl;
-            auto c = get_grid_char(grid, neighbor);
+        auto c = get_grid_char(grid, coord);
 
-            if (c == '#') {
-                continue;
-            } else if (c == '.') {
+        if (c != '#' && c != '.' && c != grid.at(origin)) {
+            targets[c] = steps;
+        }
+
+        if (c == '.' || c == grid.at(origin)) {
+            for (const auto& cell : neighboring_cells) {
+                auto neighbor = coord + cell;
                 nodes.push({neighbor, steps + 1});
-            } else if (std::islower(c)) {
-                // If we already visited this, we treat it like '.'
-                if (keys.count(std::tolower(c)) > 0) {
-                    nodes.push({neighbor, steps + 1});
-
-                // Otherwise it's a valid target
-                } else {
-                    // std::cout << "Found nei " << c << " @ " << neighbor << std::endl;
-                    targets.push_back({ neighbor, steps + 1});
-                }
-
-            } else if (std::isupper(c)) {
-                // If we have the key to this gate
-                if (keys.count(std::tolower(c)) > 0) {
-                    nodes.push({neighbor, steps + 1});
-                }
             }
         }
     }
     return targets;
 }
 
-void part1(const grid_t& grid, const coord_t& origin) {
-    std::queue<std::tuple<coord_t,std::unordered_set<char>,size_t,std::string>> nodes;
+/*
+    {
+        a: {
+            b: 12,
+            c: 25,
+            ...
+        },
+        ...
+    }
+*/
+using steps_by_target_by_target_t = std::unordered_map<char,std::unordered_map<char,size_t>>;
+steps_by_target_by_target_t make_steps_by_steps_by_target(const grid_t& grid) {
+    steps_by_target_by_target_t map;
 
-    nodes.push({origin,{},0,"@"});
+    for (const auto& kv : grid) {
+        auto pos = kv.first;
+        auto c = kv.second;
 
-    while (!nodes.empty()) {
-        auto node = nodes.front();
-        nodes.pop();
-
-        auto pos = std::get<0>(node);
-        auto keys = std::get<1>(node);
-        auto steps = std::get<2>(node);
-        auto path = std::get<3>(node);
-
-        // std::cout << "Node: " << grid.at(pos) << std::endl;
-        // std::cout << "Steps: " << steps << std::endl;
-        auto targets = get_possible_targets(grid, pos, keys);
-        if (targets.empty()) std::cout << "Exhausted with steps: " << steps << std::endl;
-        else {
-            // std::cout << grid.at(pos) << " => " << path << " steps: " << steps << std::endl;
-            for (const auto& target : get_possible_targets(grid, pos, keys)) {
-                // std::cout << grid.at(target) << " ,";
-                auto new_keys(keys);
-                new_keys.insert(grid.at(target.first));
-                nodes.push({target.first, new_keys, steps + target.second, path + grid.at(target.first)});
-            }
-
-            // std::cout << " keys: ";
-            // for (auto& k : keys) std::cout << k << ", ";
-            // std::cout << " steps: " << steps;
-            // std::cout << std::endl;
+        if (c != '#' && c != '.') {
+            map[c] = get_steps_by_target(grid, pos);
         }
+    }
+    return map;
+}
+
+void print_step_map(const steps_by_target_by_target_t& map) {
+    for (const auto& kv : map) {
+        auto origin = kv.first;
+        auto targets = kv.second;
+
+        std::cout << origin << " => ";
+        for (const auto& t : targets) {
+            auto dest = t.first;
+            auto dest_steps = t.second;
+            std::cout << dest  << " (" << dest_steps << "), ";
+        }
+        std::cout << std::endl;
     }
 }
 
-void print_grid(const grid_t& grid, const int height, const int width) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            std::cout << grid.at({y,x});
+struct node_t {
+    char label;
+    size_t steps;
+    std::bitset<26> keys;
+
+    bool has_key(char key) {
+        return keys.test(key - 'a');
+    }
+
+    void set_key(char key) {
+        keys.set(key - 'a');
+    }
+};
+
+struct node_hash {
+    size_t operator () (const node_t& node) const {
+        return std::hash<char>{}(node.label) ^ std::hash<std::bitset<26>>{}(node.keys);
+    }
+};
+
+struct heap_comp {
+    unsigned long operator () (const node_t& a, const node_t& b) const {
+        // > because we want a min heap
+        return a.steps > b.steps;
+    }
+};
+
+bool operator==(const node_t& lhs, const node_t& rhs) {
+    return lhs.label == rhs.label && lhs.keys == rhs.keys;
+}
+
+std::ostream& operator<<(std::ostream& out, const node_t& node) {
+    out << "Node (steps=" << node.steps << ", label=" << node.label;
+    out <<  ", keys=" << node.keys.to_string() << " [" << node.keys.count() << "])";
+    return out;
+}
+
+void part1(const grid_t& grid, const coord_t& origin) {
+    auto step_map = make_steps_by_steps_by_target(grid);
+
+    std::unordered_set<node_t,node_hash> seen;
+
+    heap_comp heap_comp_fn;
+
+    // Heap
+    std::vector<node_t> nodes;
+    nodes.push_back(node_t{'@', 0, {}});
+
+    int n_keys = std::count_if(
+        step_map.begin(),
+        step_map.end(),
+        [](const std::pair<char,steps_by_target_t>& pair) {
+            return std::islower(pair.first);
         }
-            std::cout << std::endl;
+    );
+
+    while (!nodes.empty()) {
+        std::pop_heap(nodes.begin(), nodes.end(), heap_comp_fn);
+        auto node = nodes.back();
+        nodes.pop_back();
+
+        if (node.keys.count() == n_keys) {
+            std::cout << "Part 1: " << node.steps << std::endl;
+            return;
+        }
+
+        if (seen.count(node) > 0) {
+            continue;
+        }
+
+        seen.insert(node);
+
+        for (const auto& kv : step_map.at(node.label)) {
+            auto dest = kv.first;
+            auto dest_steps = kv.second;
+
+            if (std::isupper(dest)) {
+                if (node.has_key(std::tolower(dest)) == 0) {
+                    continue;
+                } else {
+                    nodes.push_back(node_t{dest, node.steps + dest_steps, node.keys});
+                    std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
+                }
+            } else if (std::islower(dest)) {
+                auto new_node(node);
+                new_node.label = dest;
+                new_node.steps += dest_steps;
+                new_node.set_key(dest);
+                nodes.push_back(new_node);
+                std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
+            } else if (dest == '@') {
+                nodes.push_back({dest, node.steps + dest_steps, node.keys });
+                std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
+            }
+        }
     }
 }
 
