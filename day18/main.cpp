@@ -71,7 +71,7 @@ inline char get_grid_char(const grid_t& grid, const coord_t& coord) {
         ...
     }
 */
-using steps_by_target_t = std::unordered_map<char,size_t>;
+using steps_by_target_t = std::unordered_map<coord_t,size_t,pair_hash>;
 steps_by_target_t get_steps_by_target(const grid_t& grid, const coord_t& origin) {
     steps_by_target_t targets;
 
@@ -93,10 +93,11 @@ steps_by_target_t get_steps_by_target(const grid_t& grid, const coord_t& origin)
         auto c = get_grid_char(grid, coord);
 
         if (c != '#' && c != '.' && c != grid.at(origin)) {
-            targets[c] = steps;
+            targets[coord] = steps;
         }
 
-        if (c == '.' || c == grid.at(origin)) {
+        // if (c == '.' || c == grid.at(origin)) {
+        if (c == '.' || c == '@' || c == grid.at(origin)) {
             for (const auto& cell : neighboring_cells) {
                 auto neighbor = coord + cell;
                 nodes.push({neighbor, steps + 1});
@@ -116,7 +117,7 @@ steps_by_target_t get_steps_by_target(const grid_t& grid, const coord_t& origin)
         ...
     }
 */
-using steps_by_target_by_target_t = std::unordered_map<char,std::unordered_map<char,size_t>>;
+using steps_by_target_by_target_t = std::unordered_map<coord_t,steps_by_target_t,pair_hash>;
 steps_by_target_by_target_t make_steps_by_steps_by_target(const grid_t& grid) {
     steps_by_target_by_target_t map;
 
@@ -125,30 +126,30 @@ steps_by_target_by_target_t make_steps_by_steps_by_target(const grid_t& grid) {
         auto c = kv.second;
 
         if (c != '#' && c != '.') {
-            map[c] = get_steps_by_target(grid, pos);
+            map[pos] = get_steps_by_target(grid, pos);
         }
     }
     return map;
 }
 
-void print_step_map(const steps_by_target_by_target_t& map) {
+void print_step_map(const steps_by_target_by_target_t& map, const grid_t& grid) {
     for (const auto& kv : map) {
         auto origin = kv.first;
         auto targets = kv.second;
 
-        std::cout << origin << " => ";
+        std::cout << grid.at(origin) << " " << origin << " => ";
         for (const auto& t : targets) {
             auto dest = t.first;
             auto dest_steps = t.second;
-            std::cout << dest  << " (" << dest_steps << "), ";
+            std::cout << grid.at(dest) << " " << dest  << " (" << dest_steps << "), ";
         }
         std::cout << std::endl;
     }
 }
 
 struct node_t {
-    char label;
     size_t steps;
+    std::vector<coord_t> robots;
     std::bitset<26> keys;
 
     bool has_key(char key) {
@@ -162,7 +163,11 @@ struct node_t {
 
 struct node_hash {
     size_t operator () (const node_t& node) const {
-        return std::hash<char>{}(node.label) ^ std::hash<std::bitset<26>>{}(node.keys);
+        auto h = std::hash<std::bitset<26>>{}(node.keys);
+        for (const auto& r : node.robots) {
+            h ^= (r.first ^ r.second);
+        }
+        return h;
     }
 };
 
@@ -174,16 +179,10 @@ struct heap_comp {
 };
 
 bool operator==(const node_t& lhs, const node_t& rhs) {
-    return lhs.label == rhs.label && lhs.keys == rhs.keys;
+    return lhs.robots == rhs.robots && lhs.keys == rhs.keys;
 }
 
-std::ostream& operator<<(std::ostream& out, const node_t& node) {
-    out << "Node (steps=" << node.steps << ", label=" << node.label;
-    out <<  ", keys=" << node.keys.to_string() << " [" << node.keys.count() << "])";
-    return out;
-}
-
-void part1(const grid_t& grid, const coord_t& origin) {
+int shortest_path(const grid_t& grid, const std::vector<coord_t>& robots) {
     auto step_map = make_steps_by_steps_by_target(grid);
 
     std::unordered_set<node_t,node_hash> seen;
@@ -192,13 +191,13 @@ void part1(const grid_t& grid, const coord_t& origin) {
 
     // Heap
     std::vector<node_t> nodes;
-    nodes.push_back(node_t{'@', 0, {}});
+    nodes.push_back(node_t{0, robots, {}});
 
     int n_keys = std::count_if(
         step_map.begin(),
         step_map.end(),
-        [](const std::pair<char,steps_by_target_t>& pair) {
-            return std::islower(pair.first);
+        [&grid](const std::pair<coord_t,steps_by_target_t>& pair) {
+            return std::islower(grid.at(pair.first));
         }
     );
 
@@ -208,8 +207,7 @@ void part1(const grid_t& grid, const coord_t& origin) {
         nodes.pop_back();
 
         if (node.keys.count() == n_keys) {
-            std::cout << "Part 1: " << node.steps << std::endl;
-            return;
+            return node.steps;
         }
 
         if (seen.count(node) > 0) {
@@ -218,30 +216,40 @@ void part1(const grid_t& grid, const coord_t& origin) {
 
         seen.insert(node);
 
-        for (const auto& kv : step_map.at(node.label)) {
-            auto dest = kv.first;
-            auto dest_steps = kv.second;
+        for (int i = 0; i < node.robots.size(); i++) {
+            auto robot = node.robots[i];
+            for (const auto& kv : step_map.at(robot)) {
+                auto dest = kv.first;
+                auto dest_label = get_grid_char(grid, dest);
+                auto dest_steps = kv.second;
 
-            if (std::isupper(dest)) {
-                if (node.has_key(std::tolower(dest)) == 0) {
-                    continue;
-                } else {
-                    nodes.push_back(node_t{dest, node.steps + dest_steps, node.keys});
+                if (std::isupper(dest_label)) {
+                    if (node.has_key(std::tolower(dest_label)) == 0) {
+                        continue;
+                    } else {
+                        auto new_node(node);
+                        new_node.robots[i] = dest;
+                        new_node.steps += dest_steps;
+                        nodes.push_back(new_node);
+                        std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
+                    }
+                } else if (std::islower(dest_label)) {
+                    auto new_node(node);
+                    new_node.robots[i] = dest;
+                    new_node.steps += dest_steps;
+                    new_node.set_key(dest_label);
+                    nodes.push_back(new_node);
+                    std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
+                } else if (dest_label == '@') {
+                    auto new_node(node);
+                    new_node.steps += dest_steps;
+                    nodes.push_back(new_node);
                     std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
                 }
-            } else if (std::islower(dest)) {
-                auto new_node(node);
-                new_node.label = dest;
-                new_node.steps += dest_steps;
-                new_node.set_key(dest);
-                nodes.push_back(new_node);
-                std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
-            } else if (dest == '@') {
-                nodes.push_back({dest, node.steps + dest_steps, node.keys });
-                std::push_heap(nodes.begin(), nodes.end(), heap_comp_fn);
             }
         }
     }
+    return -1;
 }
 
 int main() {
@@ -249,5 +257,22 @@ int main() {
     auto grid = grid_pos.first;
     auto origin = grid_pos.second;
 
-    part1(grid, origin);
+    std::cout << "Part 1: " << shortest_path(grid, {origin}) << std::endl;
+
+    const std::vector<coord_t> origins = {
+        origin + coord_t{-1,-1},
+        origin + coord_t{-1,1},
+        origin + coord_t{1,-1},
+        origin + coord_t{1,1},
+    };
+
+    auto grid2(grid);
+    for (const auto& n : neighboring_cells)
+        grid2[origin + n] = '#';
+    for (const auto& n : origins)
+        grid2[n] = '@';
+
+    grid2[origin] = '#';
+
+    std::cout << "Part 1: " << shortest_path(grid2, origins) << std::endl;
 }
