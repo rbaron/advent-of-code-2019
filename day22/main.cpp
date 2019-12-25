@@ -9,6 +9,13 @@
 
 using deck_t = std::vector<uint64_t>;
 
+// Represents a congruence y = ax + b (mod N)
+struct Eq {
+    size_t a;
+    size_t b;
+    int a_sign;
+};
+
 size_t deal_into_new_stack(size_t position, size_t size) {
     return size - 1 - position;
 }
@@ -21,12 +28,12 @@ size_t deal_with_increment(size_t n, size_t position, size_t size) {
     return (position * n) % size;
 }
 
-size_t inv_deal_into_new_stack(size_t position, size_t size) {
-    return deal_into_new_stack(position, size);
+Eq inv_deal_into_new_stack(size_t size) {
+    return Eq{1, size - 1, -1};
 }
 
-size_t inv_cut(size_t n, size_t position, size_t size) {
-    return (position + (n + size)) % size;
+Eq inv_cut(size_t n, size_t size) {
+    return Eq{1, + n + size, 1};
 }
 
 // From https://cp-algorithms.com/algebra/extended-euclid-algorithm.html
@@ -43,11 +50,10 @@ int egcd(int a, int b, int & x, int & y) {
     return d;
 }
 
-size_t inv_deal_with_increment(size_t n, size_t position, size_t size) {
+Eq inv_deal_with_increment(size_t n, size_t size) {
     int x, y;
     egcd(n, size, x, y);
-    // (x + size) % size accounts for when x < 0 and is harmless if x > 0
-    return (position * ((x + size) % size)) % size;
+    return Eq{(x + size) % size, 0, 1};
 }
 
 size_t map_position(size_t position, size_t size, const std::string& method) {
@@ -70,6 +76,10 @@ size_t map_position(size_t position, size_t size, const std::string& method) {
     }
 }
 
+size_t apply(const Eq& eq, size_t x, size_t size) {
+    return (eq.a_sign * eq.a * x + eq.b) % size;
+}
+
 size_t map_inv_position(size_t position, size_t size, const std::string& method) {
     const static std::regex \
         dins("deal into new stack"), \
@@ -80,14 +90,23 @@ size_t map_inv_position(size_t position, size_t size, const std::string& method)
     std::smatch matches;
 
     if (std::regex_search(method.begin(), method.end(), matches, dins)) {
-        return inv_deal_into_new_stack(position, size);
+        return apply(inv_deal_into_new_stack(size), position, size);
     } else if (std::regex_search(method.begin(), method.end(), matches, dwi)) {
-        return inv_deal_with_increment(std::stoi(matches[1]), position, size);
+        return apply(inv_deal_with_increment(std::stoi(matches[1]), size), position, size);
     } else if (std::regex_search(method.begin(), method.end(), matches, c)) {
-        return inv_cut(std::stoi(matches[1]), position, size);
+        return apply(inv_cut(std::stoi(matches[1]), size), position, size);
     } else {
         throw std::runtime_error("Unknown suffle method: " + method);
     }
+}
+
+Eq compose(const Eq& f, const Eq& g, size_t size) {
+    // fog(x) = a1(a2x + b2) + b1 = a1a2x + a1b2 + b1 (mod N)
+    return {
+        f.a_sign * f.a * g.a_sign * g.a,
+        f.a_sign * f.a * g.b + f.b,
+        f.a_sign * g.a_sign
+    };
 }
 
 void part1() {

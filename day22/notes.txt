@@ -112,7 +112,46 @@ ax + yN = 1
 
 `x` is the multiplicative inverse, exactly like we wanted.
 
-
 * Note that is N is small, we can precompute a table of inverses by doing only the "forward" multiplication.
 This can be done for instance in the Shamir Secret Sharing scheme, since N = 256 (8 bits, 1 byte)
 (https://github.com/rbaron/secret/blob/master/secret.c#L44).
+
+# Composition of modular congruences
+
+Say we have the two congruences:
+f(x) = a1x + b1 (mod N)
+g(x) = a2x + b2 (mod N)
+
+fog(x) = a1(a2x + b2) + b1 = a1a2x + a1b2 + b1 (mod N)
+
+# How can we apply the same modular function over and over again?
+
+## Twice
+f(f(x)) = a(ax + b) + b = a^2 + ab + b
+
+## Trice
+f(f(f(x))) = a^2(ax + b) + ab + b = a^3x + a^2b + ab + b
+
+## Four times
+f^4(x) = a^3(ax + b) + a^2b + ab + b = a^4x + a^3b + a^2b + ab + b
+       = a^4 + b(a^3 + a^2 + a + 1)
+
+## n times
+f^n(x) = a^nx + a^(n-1)b + ... + ab + b
+       = a^nx + b(a^(n-1) + a^(n-2) + ... + a + 1)
+
+The part multiplying b is a geometric progression, and its sum is:
+
+(1 - r^n)/(1 - r)
+
+In our case:
+n (number of times to run the full inversion) = 101741582076661 (prime)
+N (deck size) = 119315717514047 (prime)
+
+So we need to calculate:
+
+## 1st term: a^n
+
+We know that (https://en.wikipedia.org/wiki/Fermat%27s_little_theorem), if p is prime:
+a^(p-1) = 1 (mod p)
+a^n = a^(n-1) * a = a (mod N)
