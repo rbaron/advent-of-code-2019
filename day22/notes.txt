@@ -124,6 +124,22 @@ g(x) = a2x + b2 (mod N)
 
 fog(x) = a1(a2x + b2) + b1 = a1a2x + a1b2 + b1 (mod N)
 
+## What about overflow?
+
+For the terms without multiplication by x, we can apply (mod N):
+
+a1b2 = a1b1 % N
+b1 = b1 % N
+
+For the term a1a2x, not so much:
+
+a1a2x != (a1a2x % N)x
+
+9223372036854775807
+17491307858782846976
+
+We can't do a1*a2 (mod N),
+
 # How can we apply the same modular function over and over again?
 
 ## Twice
