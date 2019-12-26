@@ -12,7 +12,6 @@
 using deck_t = std::vector<uint64_t>;
 
 using big_int = boost::multiprecision::cpp_int;
-// using big_int = __int128_t;
 
 // Represents a congruence y = ax + b (mod N)
 struct Eq {
@@ -41,23 +40,27 @@ Eq inv_cut(size_t n, size_t size) {
 }
 
 // From https://cp-algorithms.com/algebra/extended-euclid-algorithm.html
-int egcd(int a, int b, int & x, int & y) {
+big_int egcd(big_int a, big_int b, big_int& x, big_int& y) {
     if (a == 0) {
         x = 0;
         y = 1;
         return b;
     }
-    int x1, y1;
-    int d = egcd(b % a, a, x1, y1);
+    big_int x1, y1;
+    auto d = egcd(b % a, a, x1, y1);
     x = y1 - (b / a) * x1;
     y = x1;
     return d;
 }
 
-Eq inv_deal_with_increment(size_t n, size_t size) {
-    int x, y;
+big_int inv(big_int n, big_int size) {
+    big_int x, y;
     egcd(n, size, x, y);
-    return Eq{(x + size) % size, 0};
+    return (x + size) % size;
+}
+
+Eq inv_deal_with_increment(size_t n, size_t size) {
+    return Eq{inv(n, size), 0};
 }
 
 size_t map_position(size_t position, size_t size, const std::string& method) {
@@ -112,6 +115,16 @@ Eq compose(const Eq& f, const Eq& g, size_t size) {
     };
 }
 
+// From https://en.wikipedia.org/wiki/Exponentiation_by_squaring#Basic_method
+big_int exp(big_int x, big_int n, size_t size) {
+    if (n == 0) return  1;
+    else if (n == 1) return x;
+    // n is even
+    else if (n % 2 == 0) return exp(x * x % size, n / 2, size);
+    // n is odd
+    else return x * exp(x * x % size, (n - 1) / 2, size);
+}
+
 void part1() {
     constexpr size_t size = 10007;
     size_t pos = 2019;
@@ -126,11 +139,13 @@ void part1() {
     std::cout << "Part 1: " << pos << std::endl;
 }
 
+// See ./notes.txt for the rationale behind this
 void part2() {
     std::vector<std::string> methods;
 
-    constexpr size_t size = 10007;
-    big_int pos = 6850;
+    constexpr size_t size = 119315717514047;
+    constexpr size_t times = 101741582076661;
+    big_int pos = 2020;
 
     std::fstream file("input.txt");
     std::string line;
@@ -141,7 +156,11 @@ void part2() {
         eq = compose(map_inv_position(size, *it), eq, size);
     }
 
-    std::cout << "Part 2: " << static_cast<uint64_t>(apply(eq, pos, size)) << std::endl;
+    auto term_1 = exp(eq.a, times, size);
+    auto term_2 = inv(eq.a - 1, size);
+
+    Eq e2{term_1, eq.b * (term_1 - 1) * term_2};
+    std::cout << "Part 2: " << apply(e2, pos, size) % size << std::endl;
 }
 
 int main() {
